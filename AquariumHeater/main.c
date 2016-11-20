@@ -12,11 +12,10 @@
 #include "commons.h"
 #include "max7219.h"
 
-/*be very carefull with it. there are -ffixed-reg option in compiler settings. 
+/*be very carefull with these 4 register variables. there are -ffixed-reg option in compiler settings. 
   but who knows which library procedure could use these registers*/
 register uint8_t SINTERRUPTS asm("r3");
 register uint8_t DST_T asm("r4");
-
 register uint8_t CUR_T asm("r5");
 register uint8_t CUR_LT asm("r6");
 
