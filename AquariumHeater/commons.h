@@ -19,8 +19,7 @@
 #define enable_adc_int() ( ADCSRA |= (1 << ADIE))
 #define disable_adc_int() ( ADCSRA &= ~(1 << ADIE))  
 #define enable_pcie_int() (GIMSK |= (1 << PCIE))
-#define disable_pcie_interrupt() (GIMSK &= ~(1 << PCIE))
-#define enable
+#define disable_pcie_int() (GIMSK &= ~(1 << PCIE))
 
 enum sinterrupt {
 	sinterrupt_adc_finished = (1 << 1),

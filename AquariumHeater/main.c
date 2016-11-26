@@ -39,7 +39,7 @@ ISR(ADC_vect, ISR_NAKED) {
 
 ISR(PCINT0_vect, ISR_NAKED) {
 	asm("push r24" "\n\t");
-	disable_pcie_interrupt();	
+	disable_pcie_int();	
 	do {
 		if ((PINB & PIN_BTN_UP) == 0) {
 			++DST_T;
