@@ -67,9 +67,9 @@ static inline void start_adc() {
 int
 main(void) {  
 	SINTERRUPTS = CUR_T = CUR_LT = 0x00;
-	DST_T = 25;
+	DST_T = 35;
   //configure adc
-  ADCSRA |= (1 << ADPS1) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADEN); //use 64 prescaler. in our program it's 8000000/64 = 125kHz
+  ADCSRA |= (1 << ADPS1) | (1 << ADPS2) | (1 << ADEN); //use 64 prescaler. in our program it's 8000000/64 = 125kHz
 	enable_adc_int(); //enable adc interrupt
   
   max7219_init();
@@ -77,24 +77,25 @@ main(void) {
 	
 	PCMSK = PORT_BTN_DOWN | PORT_BTN_UP;
 	enable_pcie_int();
-  sei();	
+  
+	sei();	
 	start_adc();
 	
   while (1) {
 	  if (SINTERRUPTS & sinterrupt_adc_finished) {
 		  handle_sint_adc();
-			if (CUR_LT != CUR_T) {
-				CUR_LT = CUR_T;
-				print_current_temperature();
-			}
-			max7219_turn_heater(CUR_T < DST_T);
+		  if (CUR_LT != CUR_T) {
+			  CUR_LT = CUR_T;
+			  print_current_temperature();
+		  }
+		  max7219_turn_heater(CUR_T < DST_T);
 	  }
 
-		if (SINTERRUPTS & sinterrupt_dst_temperature_changed) {
-			SINTERRUPTS &= ~sinterrupt_dst_temperature_changed;
-			print_dest_temperature();
-			max7219_turn_heater(CUR_T < DST_T);
-		}
+	  if (SINTERRUPTS & sinterrupt_dst_temperature_changed) {
+		  SINTERRUPTS &= ~sinterrupt_dst_temperature_changed;
+		  print_dest_temperature();
+		  max7219_turn_heater(CUR_T < DST_T);
+	  }
   }
 }
 //////////////////////////////////////////////////////////////////////////
@@ -115,17 +116,9 @@ handle_sint_adc() {
 			adc_avg += ADCW;
 			break;
 		}
-
-		adc_avg >>= 6;
-		++adc_avg; //because we don't want adc == 0
-		adc_cnt = ADC_CNT+1;
 		
-		if ((adc_avg ^ adc_val) < ADC_DIFF) { //if (abs(adx_avg-adc_val) < ADC_DIFF)
-			adc_avg = 0;
-			break;
-		}
-		
-		adc_val = adc_avg;
+		adc_cnt = ADC_CNT+1;			
+		adc_val = adc_avg >> 6;
 		adc_avg = 0;
 
 		r = TERMISTOR_RREF / (1024.0f / adc_val - 1);

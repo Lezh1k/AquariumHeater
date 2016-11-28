@@ -39,7 +39,7 @@ spi_send(uint8_t sb) {
 void 
 spi_max7219_send(uint16_t w) {
   SPI_PORT &= ~SPI_CS;
-	spi_send((w & 0xff00) >> 8);
+	spi_send(w >> 8);
   spi_send(w & 0x00ff);
   SPI_PORT |= SPI_CS;
 }
@@ -47,8 +47,8 @@ spi_max7219_send(uint16_t w) {
 
 void 
 max7219_init() {
-  SPI_DDR |= SPI_MOSI | SPI_CS | SPI_SCK;
-  SPI_PORT |= SPI_MOSI | SPI_CS ;							
+  SPI_DDR = SPI_MOSI | SPI_CS | SPI_SCK;
+  SPI_PORT = SPI_MOSI | SPI_CS ;							
 	
 	spi_max7219_send(0x0c01); //normal operation
 	spi_max7219_send(0x0900); //decode mode disable

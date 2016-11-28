@@ -16,10 +16,12 @@
 #define UART_PERIOD (F_TIMER / BAUD_RATE)
 #define UART_HALF_PERIOD (F_TIMER / (BAUD_RATE*2))
 
-#define enable_adc_int() ( ADCSRA |= (1 << ADIE))
-#define disable_adc_int() ( ADCSRA &= ~(1 << ADIE))  
+#define enable_adc_int() (ADCSRA |= (1 << ADIE))
+#define disable_adc_int() (ADCSRA &= ~(1 << ADIE))  
 #define enable_pcie_int() (GIMSK |= (1 << PCIE))
 #define disable_pcie_int() (GIMSK &= ~(1 << PCIE))
+#define enable_tim0_ovf_int() (TIMSK |= (1 << TOIE0))
+#define disable_tim0_ovf_int() (TIMSK &= ~(1 << TOIE0))
 
 enum sinterrupt {
 	sinterrupt_adc_finished = (1 << 1),
