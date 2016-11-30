@@ -12,8 +12,8 @@
 #include <stdint.h>
 
 typedef enum max7219_screen {
-  MS_0 = 0,
-  MS_1 = 1
+  MS_0 = 0x01,
+  MS_1 = 0x03
 } max7219_screen_t;
 
 void max7219_init();

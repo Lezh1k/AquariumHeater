@@ -29,6 +29,19 @@ static void handle_sint_adc();
 static inline void print_dest_temperature();
 static inline void print_current_temperature();
 
+static inline void start_adc() {
+	ADCSRA |= (1 << ADSC);
+}
+//////////////////////////////////////////////////////////////////////////
+
+ISR(TIMER0_OVF_vect, ISR_NAKED) {
+	asm("push r24" "\n\t");
+	SINTERRUPTS |= sinterrupt_tim0_ovf;
+	asm("pop r24" "\n\t");
+	reti();
+}
+//////////////////////////////////////////////////////////////////////////
+
 ISR(ADC_vect, ISR_NAKED) {
 	asm("push r24" "\n\t");
   SINTERRUPTS |= sinterrupt_adc_finished;
@@ -41,13 +54,13 @@ ISR(PCINT0_vect, ISR_NAKED) {
 	asm("push r24" "\n\t");
 	disable_pcie_int();	
 	do {
-		if ((PINB & PIN_BTN_UP) == 0) {
+		if (!(PINB & PIN_BTN_UP)) {
 			++DST_T;
 			SINTERRUPTS |= sinterrupt_dst_temperature_changed;
 			break;
 		}
 
-		if ((PINB & PIN_BTN_DOWN) == 0) {
+		if (!(PINB & PIN_BTN_DOWN)) {
 			--DST_T;
 			SINTERRUPTS |= sinterrupt_dst_temperature_changed;
 			break;
@@ -59,17 +72,14 @@ ISR(PCINT0_vect, ISR_NAKED) {
 }
 //////////////////////////////////////////////////////////////////////////
 
-static inline void start_adc() {
-	ADCSRA |= (1 << ADSC); 
-}
-//////////////////////////////////////////////////////////////////////////
-
+enum {TIM0_OVF_CNT = 3};
 int
 main(void) {  
-	SINTERRUPTS = CUR_T = CUR_LT = 0x00;
+	register int8_t tim0_ovf_cnt = TIM0_OVF_CNT;
+	SINTERRUPTS = CUR_T = 0x00;
 	DST_T = 35;
   //configure adc
-  ADCSRA |= (1 << ADPS1) | (1 << ADPS2) | (1 << ADEN); //use 64 prescaler. in our program it's 8000000/64 = 125kHz
+  ADCSRA = (1 << ADPS2) | (1 << ADEN); //use 16 prescaler. in our program it's 1000000/16 ~ 65kHz
 	enable_adc_int(); //enable adc interrupt
   
   max7219_init();
@@ -77,6 +87,9 @@ main(void) {
 	
 	PCMSK = PORT_BTN_DOWN | PORT_BTN_UP;
 	enable_pcie_int();
+
+	TCCR0B = (1 << CS02) | (1 << CS00); //1024 prescalser ~0.3 sec.
+	enable_tim0_ovf_int();
   
 	sei();	
 	start_adc();
@@ -84,10 +97,6 @@ main(void) {
   while (1) {
 	  if (SINTERRUPTS & sinterrupt_adc_finished) {
 		  handle_sint_adc();
-		  if (CUR_LT != CUR_T) {
-			  CUR_LT = CUR_T;
-			  print_current_temperature();
-		  }
 		  max7219_turn_heater(CUR_T < DST_T);
 	  }
 
@@ -96,12 +105,18 @@ main(void) {
 		  print_dest_temperature();
 		  max7219_turn_heater(CUR_T < DST_T);
 	  }
+
+	  if (SINTERRUPTS & sinterrupt_tim0_ovf) {
+		  SINTERRUPTS &= ~sinterrupt_tim0_ovf;	
+		  if (!(--tim0_ovf_cnt)) {
+			  tim0_ovf_cnt = TIM0_OVF_CNT;
+				print_current_temperature();
+		  }			
+	  }
   }
 }
 //////////////////////////////////////////////////////////////////////////
 
-//~0.5C . 
-#define ADC_DIFF 6
 void
 handle_sint_adc() {
 	enum {ADC_CNT = 64}; //(0xffff / 0x03ff)
@@ -126,9 +141,8 @@ handle_sint_adc() {
 		st = logf(st);
 		st /= TERMISTOR_B;
 		st += 1.0f / (TERMISTOR_T0 + 273.15f);
-		st = 1.0f / st;
-		st -= 273.15f;
-		CUR_T = (uint8_t)st;
+		st = 1.0f / st;		
+		CUR_T = (uint8_t)(st - 273.15f);
 	} while(0);
 
 	start_adc();
