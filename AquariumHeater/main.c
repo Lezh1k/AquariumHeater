@@ -207,8 +207,10 @@ uint8_t adcw_to_temperature(uint16_t adc_avg) {
 		-44, -45, -46, -48, -49, -50, -52, -53,
 		-55, -57, -60, -62, -65, -70, -76, -88,
 	};
-
-	return pgm_read_byte(&adc_temperature[adc_avg / 2]);
+	int16_t f, l;
+	f= pgm_read_byte(&adc_temperature[adc_avg / 2]);
+	l= pgm_read_byte(&adc_temperature[adc_avg / 2 + 1]);
+	return adc_avg % 2 ? f/2+l/2 : f;	
 }
 //////////////////////////////////////////////////////////////////////////
 
