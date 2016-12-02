@@ -23,6 +23,8 @@
 #define enable_tim0_ovf_int() (TIMSK |= (1 << TOIE0))
 #define disable_tim0_ovf_int() (TIMSK &= ~(1 << TOIE0))
 
+#define nop() asm("nop" "\n\t")
+
 enum sinterrupt {
 	sinterrupt_adc_finished = (1 << 1),
 	sinterrupt_dst_temperature_changed = (1 << 2),
