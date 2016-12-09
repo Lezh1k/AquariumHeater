@@ -3,3 +3,4 @@ AquariumHeater/Debug/*
 .vs/*
 bin/*
 build/*
+*.pro.user

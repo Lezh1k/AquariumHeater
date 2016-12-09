@@ -10,10 +10,8 @@
 #include <math.h>
 #include <avr/pgmspace.h>
 
-/*#include "include/commons.h"
-#include "include/max7219.h"*/
-#include <commons.h>
-#include <max7219.h>
+#include "commons.h"
+#include "max7219.h"
 
 static volatile uint8_t SINTERRUPTS = 0; 
 static volatile uint8_t DST_T = 35;
@@ -49,14 +47,13 @@ ISR(ADC_vect) {
 //////////////////////////////////////////////////////////////////////////
 
 ISR(PCINT0_vect) {
-  disable_pcie_int();	
-  nop();
-
+  disable_pcie_int();
   if (!(PINB & PIN_BTN_UP))
     ++DST_T;		
   if (!(PINB & PIN_BTN_DOWN)) 
     --DST_T;	
   SINTERRUPTS |= sinterrupt_dst_temperature_changed;
+  nop();
   enable_pcie_int();
 }
 //////////////////////////////////////////////////////////////////////////
