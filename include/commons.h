@@ -25,13 +25,6 @@
 
 #define nop() asm volatile("nop" "\n\t")
 
-enum sinterrupt {
-  sinterrupt_adc_finished = (1 << 1),
-  sinterrupt_dst_temperature_changed = (1 << 2),
-  sinterrupt_tim0_ovf = (1 << 3),
-  sinterrupt_tim1_ovf = (1 << 4)
-};
-
 #define TERMISTOR_B		3380
 #define TERMISTOR_RREF		10000
 #define TERMISTOR_R0		10000

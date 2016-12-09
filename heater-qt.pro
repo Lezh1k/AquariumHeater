@@ -15,3 +15,6 @@ INCLUDEPATH += /home/lezh1k/avr8-gnu-toolchain-linux_x86_64/avr/include
 INCLUDEPATH += include
 
 DEFINES += __AVR_ATtiny25__
+
+DISTFILES += \
+    Makefile
