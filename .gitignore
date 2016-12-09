@@ -1,3 +1,5 @@
 AquariumHeater/Release/*
 AquariumHeater/Debug/*
 .vs/*
+bin/*
+build/*

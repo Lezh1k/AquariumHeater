@@ -10,9 +10,9 @@
 
 #include <stdint.h>
 
-#define BAUD_RATE 9600
-#define F_CPU 8000000UL
-#define F_TIMER 1000000UL
+#define BAUD_RATE   9600
+#define F_CPU       8000000UL
+#define F_TIMER     1000000UL
 #define UART_PERIOD (F_TIMER / BAUD_RATE)
 #define UART_HALF_PERIOD (F_TIMER / (BAUD_RATE*2))
 
@@ -31,9 +31,9 @@ enum sinterrupt {
   sinterrupt_tim0_ovf = (1 << 3)
 };
 
-#define TERMISTOR_B				3380
+#define TERMISTOR_B		3380
 #define TERMISTOR_RREF		10000
-#define TERMISTOR_R0			10000
-#define TERMISTOR_T0			25
+#define TERMISTOR_R0		10000
+#define TERMISTOR_T0		25
 
 #endif /* COMMONS_H_ */

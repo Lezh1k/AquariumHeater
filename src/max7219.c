@@ -54,7 +54,7 @@ max7219_init() {
   spi_max7219_send(0x0900); //decode mode disable
   spi_max7219_send(0x0f00); //test disable				   
   spi_max7219_send(0x0b03); //symbols count = 4	   
-  spi_max7219_send(0x0a0f); //brightness level is quater of max (0f is max)
+  spi_max7219_send(0x0a0f); //brightness level is max (0f is max)
   //
   //// - - - - 
   spi_max7219_send(0x0101);
