@@ -14,9 +14,9 @@
 #define SPI_PORT      PORTB
 #define SPI_PIN       PINB
 
-#define SPI_MOSI      (1<<PB2)
 #define SPI_CS        (1<<PB0)
 #define SPI_SCK       (1<<PB1)
+#define SPI_MOSI      (1<<PB2)
 
 #define HEATER_PORT		SPI_SCK
 

@@ -21,12 +21,11 @@ static volatile uint8_t int_pcint0 = 0;
 
 static volatile uint8_t DST_T = 35;
 static volatile uint8_t CUR_T = 0;
-static volatile uint8_t CUR_LT = 0;
 
-#define PIN_BTN_UP (1 << PINB1)
-#define PIN_BTN_DOWN (1 << PINB0)
-#define PORT_BTN_UP (1 << PB1)
-#define PORT_BTN_DOWN (1 << PB0)
+#define PIN_BTN_UP (1 << PINB3)
+#define PIN_BTN_DOWN (1 << PINB4)
+#define PORT_BTN_UP (1 << PB3)
+#define PORT_BTN_DOWN (1 << PB4)
 //////////////////////////////////////////////////////////////////////////
 
 static void handle_sint_adc();
@@ -39,20 +38,20 @@ static inline void start_adc() {
 }
 //////////////////////////////////////////////////////////////////////////
 
-ISR(TIMER0_OVF_vect) {	
+ISR(TIMER0_OVF_vect) {
   int_tim0_ovf = 1;
   nop();
 }
 //////////////////////////////////////////////////////////////////////////
 
-ISR(ADC_vect) {	
+ISR(ADC_vect) {
   int_adc = 1;
   nop();
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(PCINT0_vect) {
-  disable_pcie_int();  
+  disable_pcie_int();
   int_pcint0 = 1;
   nop();
 }
@@ -60,9 +59,10 @@ ISR(PCINT0_vect) {
 
 
 int
-main(void) {  
+main(void) {
   enum {TIM0_OVF_CNT = 3};
   register int8_t tim0_ovf_cnt = TIM0_OVF_CNT;
+  register uint8_t old_t = 0;
   //configure adc
   ADCSRA = (1 << ADPS2) | (1 << ADEN) ; //use 16 prescaler. in our program it's 1000000/16 ~ 65kHz
   enable_adc_int(); //enable adc interrupt
@@ -76,8 +76,8 @@ main(void) {
   TCCR0B = (1 << CS02) | (1 << CS00); //1024 prescalser ~0.3 sec.
   enable_tim0_ovf_int();
 
-  sei();	
-  start_adc();	
+  sei();
+  start_adc();
 
   while (1) {
 
@@ -89,7 +89,7 @@ main(void) {
     }
 
     if (int_pcint0) {
-      _delay_ms(50); //todo use timer for this
+      _delay_ms(70); //todo use timer for this
       if (!(PINB & PIN_BTN_UP))
         ++DST_T;
       if (!(PINB & PIN_BTN_DOWN))
@@ -104,8 +104,11 @@ main(void) {
       int_tim0_ovf = 0;
       if (!(--tim0_ovf_cnt)) {
         tim0_ovf_cnt = TIM0_OVF_CNT;
-        print_current_temperature();
-      }			
+        if (old_t != CUR_T) {
+          print_current_temperature();
+          old_t = CUR_T;
+        }
+      }
     }
   }
 }
@@ -116,18 +119,18 @@ handle_sint_adc() {
   enum {ADC_CNT = 64}; //(0xffff / 0x03ff)
   static int8_t adc_cnt = ADC_CNT+1;
   static uint16_t adc_avg = 0;
-  do {    
+  do {
     if (--adc_cnt) {
       adc_avg += ADCW;
       break;
-    }		
-    adc_cnt = ADC_CNT+1;			
+    }
+    adc_cnt = ADC_CNT+1;
     adc_avg >>= 6;
     CUR_T = adcw_to_temperature(adc_avg);
     adc_avg = 0;
-  } while(0);	
+  } while(0);
 }
-//////////////////////////////////////////////////////////////////////////							 
+//////////////////////////////////////////////////////////////////////////
 
 //change this table if TERMISTOR_B, TERMISTOR_RREF, TERMISTOR_R0 or TERMISTOR_T0 is changed
 static const int16_t adc_temperature[] PROGMEM= {
@@ -165,7 +168,7 @@ static const int16_t adc_temperature[] PROGMEM= {
   -448, -458, -469, -481, -494, -508, -523, -539, -557, -577, -600, -627, -659, -701, -762, -881,
 };
 
-uint8_t adcw_to_temperature(uint16_t adc_avg) {  
+uint8_t adcw_to_temperature(uint16_t adc_avg) {
   int16_t f, l, r;
   f= pgm_read_word(&adc_temperature[adc_avg / 2]);
   l= pgm_read_word(&adc_temperature[adc_avg / 2 + 1]);
@@ -180,7 +183,7 @@ print_current_temperature() {
 }
 //////////////////////////////////////////////////////////////////////////
 
-void 
+void
 print_dest_temperature() {
   max7219_set_symbol(MS_1, DST_T);
 }
