@@ -4,3 +4,4 @@ AquariumHeater/Debug/*
 bin/*
 build/*
 *.pro.user
+heater-qt.pro.user

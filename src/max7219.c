@@ -3,7 +3,7 @@
  *
  * Created: 25.10.2016 18:05:29
  *  Author: Lezh1k
- */ 
+ */
 
 #include <avr/io.h>
 #include <avr/pgmspace.h>
@@ -48,15 +48,15 @@ spi_max7219_send(uint16_t w) {
 void 
 max7219_init() {
   SPI_DDR = SPI_MOSI | SPI_CS | SPI_SCK;
-  SPI_PORT = SPI_MOSI | SPI_CS ;							
+  SPI_PORT = SPI_MOSI | SPI_CS ;
 
   spi_max7219_send(0x0c01); //normal operation
   spi_max7219_send(0x0900); //decode mode disable
-  spi_max7219_send(0x0f00); //test disable				   
-  spi_max7219_send(0x0b03); //symbols count = 4	   
+  spi_max7219_send(0x0f00); //test disable
+  spi_max7219_send(0x0b03); //symbols count = 4
   spi_max7219_send(0x0a0f); //brightness level is max (0f is max)
   //
-  //// - - - - 
+  //// - - - -
   spi_max7219_send(0x0101);
   spi_max7219_send(0x0201);
   spi_max7219_send(0x0301);
@@ -65,7 +65,7 @@ max7219_init() {
 //////////////////////////////////////////////////////////////////////////
 
 enum {SC_G = 1, SC_F = 1 << 1, SC_E = 1 << 2, SC_D = 1 << 3,
-  SC_C = 1 << 4, SC_B = 1 << 5, SC_A = 1 << 6, SC_DP = 1 << 7};
+      SC_C = 1 << 4, SC_B = 1 << 5, SC_A = 1 << 6, SC_DP = 1 << 7};
 
 const uint8_t codes[10] PROGMEM= {
   SC_A | SC_B | SC_C | SC_D | SC_E | SC_F, // 0
@@ -83,9 +83,9 @@ const uint8_t codes[10] PROGMEM= {
 // 0bDP_A_B_C_D_E_F_G
 void 
 max7219_set_symbol(max7219_screen_t pos, 
-    uint8_t sym) {
+                   uint8_t sym) {
   register uint8_t spi_port = SPI_PORT;
-  uint16_t s = ((pos+1) << 8) | pgm_read_byte(&codes[sym%10]);	
+  uint16_t s = ((pos+1) << 8) | pgm_read_byte(&codes[sym%10]);
   SPI_PORT &= ~HEATER_PORT;
   spi_max7219_send(s);
   sym /= 10;

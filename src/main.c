@@ -11,16 +11,15 @@
 #include <avr/pgmspace.h>
 
 #include "commons.h"
-#include <util/delay.h>
-
 #include "max7219.h"
 
-static volatile uint8_t int_tim0_ovf = 0;
-static volatile uint8_t int_adc = 0;
-static volatile uint8_t int_pcint0 = 0;
+register uint8_t int_tim0_ovf asm("r3");
+register uint8_t int_adc asm("r4");
+register uint8_t int_pcint0 asm("r5");
+register uint8_t int_tim1_ovf asm("r6");
 
-static volatile uint8_t DST_T = 35;
-static volatile uint8_t CUR_T = 0;
+static volatile uint8_t DST_T;
+static volatile uint8_t CUR_T;
 
 #define PIN_BTN_UP (1 << PINB3)
 #define PIN_BTN_DOWN (1 << PINB4)
@@ -38,21 +37,28 @@ static inline void start_adc() {
 }
 //////////////////////////////////////////////////////////////////////////
 
+ISR(TIMER1_OVF_vect) {
+  disable_tim1_ovf_int();
+  ++int_tim1_ovf;
+  nop();
+}
+//////////////////////////////////////////////////////////////////////////
+
 ISR(TIMER0_OVF_vect) {
-  int_tim0_ovf = 1;
+  ++int_tim0_ovf;
   nop();
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(ADC_vect) {
-  int_adc = 1;
+  ++int_adc;
   nop();
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(PCINT0_vect) {
   disable_pcie_int();
-  int_pcint0 = 1;
+  ++int_pcint0;
   nop();
 }
 //////////////////////////////////////////////////////////////////////////
@@ -60,9 +66,11 @@ ISR(PCINT0_vect) {
 
 int
 main(void) {
-  enum {TIM0_OVF_CNT = 3};
+  enum {TIM0_OVF_CNT = 3, START_DST_T = 35};
   register int8_t tim0_ovf_cnt = TIM0_OVF_CNT;
   register uint8_t old_t = 0;
+  int_tim0_ovf = int_adc = int_pcint0 = CUR_T = 0;
+  DST_T = START_DST_T;
   //configure adc
   ADCSRA = (1 << ADPS2) | (1 << ADEN) ; //use 16 prescaler. in our program it's 1000000/16 ~ 65kHz
   enable_adc_int(); //enable adc interrupt
@@ -73,8 +81,10 @@ main(void) {
   PCMSK = PORT_BTN_DOWN | PORT_BTN_UP;
   enable_pcie_int();
 
-  TCCR0B = (1 << CS02) | (1 << CS00); //1024 prescalser ~0.3 sec.
+  TCCR0B = (1 << CS02) | (1 << CS00); //1024 prescaler ~0.3 sec.
   enable_tim0_ovf_int();
+
+  TCCR1 = (1 << CS13) | (1 << CS10); //256 prescaler ~0.07sec
 
   sei();
   start_adc();
@@ -84,24 +94,29 @@ main(void) {
     if (int_adc) {
       handle_sint_adc();
       max7219_turn_heater(CUR_T < DST_T);
-      int_adc = 0;
+      --int_adc;
       start_adc();
     }
 
     if (int_pcint0) {
-      _delay_ms(70); //todo use timer for this
+      --int_pcint0;
+      TCNT1 = 0;
+      enable_tim1_ovf_int();
+    }
+
+    if (int_tim1_ovf) {
       if (!(PINB & PIN_BTN_UP))
         ++DST_T;
       if (!(PINB & PIN_BTN_DOWN))
         --DST_T;
       print_dest_temperature();
       max7219_turn_heater(CUR_T < DST_T);
-      int_pcint0 = 0;
+      --int_tim1_ovf;
       enable_pcie_int();
     }
 
     if (int_tim0_ovf) {
-      int_tim0_ovf = 0;
+      --int_tim0_ovf;
       if (!(--tim0_ovf_cnt)) {
         tim0_ovf_cnt = TIM0_OVF_CNT;
         if (old_t != CUR_T) {

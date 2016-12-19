@@ -9,12 +9,9 @@
 #define COMMONS_H_
 
 #include <stdint.h>
+#include <avr/io.h>
 
-#define BAUD_RATE   9600
 #define F_CPU       1000000UL
-#define F_TIMER     1000000UL
-#define UART_PERIOD (F_TIMER / BAUD_RATE)
-#define UART_HALF_PERIOD (F_TIMER / (BAUD_RATE*2))
 
 #define enable_adc_int() (ADCSRA |= (1 << ADIE))
 #define disable_adc_int() (ADCSRA &= ~(1 << ADIE))  
@@ -22,6 +19,8 @@
 #define disable_pcie_int() (GIMSK &= ~(1 << PCIE))
 #define enable_tim0_ovf_int() (TIMSK |= (1 << TOIE0))
 #define disable_tim0_ovf_int() (TIMSK &= ~(1 << TOIE0))
+#define enable_tim1_ovf_int() (TIMSK |= (1 << TOIE1))
+#define disable_tim1_ovf_int() (TIMSK &= ~(1 << TOIE1))
 
 #define nop() asm volatile("nop" "\n\t")
 
