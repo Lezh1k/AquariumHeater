@@ -39,26 +39,26 @@ static inline void start_adc() {
 
 ISR(TIMER1_OVF_vect) {
   disable_tim1_ovf_int();
-  ++int_tim1_ovf;
+  int_tim1_ovf = 1;
   nop();
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(TIMER0_OVF_vect) {
-  ++int_tim0_ovf;
+  int_tim0_ovf = 1;
   nop();
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(ADC_vect) {
-  ++int_adc;
+  int_adc = 1;
   nop();
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(PCINT0_vect) {
   disable_pcie_int();
-  ++int_pcint0;
+  int_pcint0 = 1;
   nop();
 }
 //////////////////////////////////////////////////////////////////////////
@@ -92,31 +92,31 @@ main(void) {
   while (1) {
 
     if (int_adc) {
+      int_adc = 0; //maybe need to use int_adc ^= int_adc;
       handle_sint_adc();
       max7219_turn_heater(CUR_T < DST_T);
-      --int_adc;
       start_adc();
     }
 
     if (int_pcint0) {
-      --int_pcint0;
+      int_pcint0 = 0;
       TCNT1 = 0;
       enable_tim1_ovf_int();
     }
 
     if (int_tim1_ovf) {
+      int_tim1_ovf = 0;
       if (!(PINB & PIN_BTN_UP))
         ++DST_T;
       if (!(PINB & PIN_BTN_DOWN))
         --DST_T;
       print_dest_temperature();
       max7219_turn_heater(CUR_T < DST_T);
-      --int_tim1_ovf;
       enable_pcie_int();
     }
 
     if (int_tim0_ovf) {
-      --int_tim0_ovf;
+      int_tim0_ovf = 0;
       if (!(--tim0_ovf_cnt)) {
         tim0_ovf_cnt = TIM0_OVF_CNT;
         if (old_t != CUR_T) {
