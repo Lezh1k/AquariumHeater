@@ -81,9 +81,9 @@ const uint8_t codes[10] PROGMEM= {
 };
 
 // 0bDP_A_B_C_D_E_F_G
-void 
+void
 max7219_set_symbol(max7219_screen_t pos, 
-                   uint8_t sym) {
+                   int16_t sym) {
   register uint8_t spi_port = SPI_PORT;
   uint16_t s = ((pos+1) << 8) | pgm_read_byte(&codes[sym%10]);
   SPI_PORT &= ~HEATER_PORT;

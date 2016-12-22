@@ -13,13 +13,15 @@
 #include "commons.h"
 #include "max7219.h"
 
-register uint8_t int_tim0_ovf asm("r3");
+register uint8_t int_tim0_compa asm("r3");
 register uint8_t int_adc asm("r4");
 register uint8_t int_pcint0 asm("r5");
 register uint8_t int_tim1_ovf asm("r6");
 
-static volatile uint8_t DST_T;
-static volatile uint8_t CUR_T;
+volatile uint8_t btn_down;
+volatile uint8_t btn_up;
+
+enum {START_DST_T = 35};
 
 #define PIN_BTN_UP (1 << PINB3)
 #define PIN_BTN_DOWN (1 << PINB4)
@@ -27,10 +29,8 @@ static volatile uint8_t CUR_T;
 #define PORT_BTN_DOWN (1 << PB4)
 //////////////////////////////////////////////////////////////////////////
 
-static void handle_sint_adc();
-static inline void print_dest_temperature();
-static inline void print_current_temperature();
-uint8_t adcw_to_temperature(uint16_t adc_avg);
+static void handle_sint_adc(int16_t *cur_t);
+static int16_t adcw_to_temperature(uint16_t adc_avg);
 
 static inline void start_adc() {
   ADCSRA |= (1 << ADSC);
@@ -38,53 +38,63 @@ static inline void start_adc() {
 //////////////////////////////////////////////////////////////////////////
 
 ISR(TIMER1_OVF_vect) {
-  disable_tim1_ovf_int();
   int_tim1_ovf = 1;
-  nop();
 }
 //////////////////////////////////////////////////////////////////////////
 
-ISR(TIMER0_OVF_vect) {
-  int_tim0_ovf = 1;
-  nop();
+ISR(TIMER0_COMPA_vect) {
+  disable_tim0_compa_int();
+  int_tim0_compa = 1;
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(ADC_vect) {
   int_adc = 1;
-  nop();
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(PCINT0_vect) {
   disable_pcie_int();
-  int_pcint0 = 1;
-  nop();
+  do {
+    if (!(PINB & PIN_BTN_UP)) {
+      btn_up = int_pcint0 = 1;
+      break;
+    }
+    if (!(PINB & PIN_BTN_DOWN)) {
+      btn_down = int_pcint0 = 1;
+      break;
+    }
+    enable_pcie_int();
+  } while(0);
 }
 //////////////////////////////////////////////////////////////////////////
 
 
 int
 main(void) {
-  enum {TIM0_OVF_CNT = 3, START_DST_T = 35};
-  register int8_t tim0_ovf_cnt = TIM0_OVF_CNT;
-  register uint8_t old_t = 0;
-  int_tim0_ovf = int_adc = int_pcint0 = CUR_T = 0;
-  DST_T = START_DST_T;
+  int16_t dst_t = START_DST_T;
+  int16_t cur_t = 0;
+  int16_t old_t = 0;
+
+  btn_down = btn_up = 0;
+  int_tim0_compa = int_adc = int_pcint0 = 0;
   //configure adc
   ADCSRA = (1 << ADPS2) | (1 << ADEN) ; //use 16 prescaler. in our program it's 1000000/16 ~ 65kHz
   enable_adc_int(); //enable adc interrupt
 
   max7219_init();
-  print_dest_temperature();
+  max7219_set_symbol(MS_1, dst_t);
+
+  PORTB = PORT_BTN_DOWN | PORT_BTN_UP; //pull up resistors
 
   PCMSK = PORT_BTN_DOWN | PORT_BTN_UP;
   enable_pcie_int();
 
-  TCCR0B = (1 << CS02) | (1 << CS00); //1024 prescaler ~0.3 sec.
-  enable_tim0_ovf_int();
+  TCCR0B = (1 << CS01) | (1 << CS00); //64 prescaler = 0,016320003
+  OCR0A = 157; //~0.01 sec
 
-  TCCR1 = (1 << CS13) | (1 << CS10); //256 prescaler ~0.07sec
+  TCCR1 = (1 << CS13) | (1 << CS12) | (1 << CS10); //4096 prescaler ~1.2sec
+  enable_tim1_ovf_int();
 
   sei();
   start_adc();
@@ -92,62 +102,85 @@ main(void) {
   while (1) {
 
     if (int_adc) {
-      int_adc = 0; //maybe need to use int_adc ^= int_adc;
-      handle_sint_adc();
-      max7219_turn_heater(CUR_T < DST_T);
+      int_adc = 0;
+      handle_sint_adc(&cur_t);
+      max7219_turn_heater(cur_t < dst_t);
       start_adc();
     }
 
     if (int_pcint0) {
       int_pcint0 = 0;
-      TCNT1 = 0;
-      enable_tim1_ovf_int();
+      TCNT0 = 0;
+      enable_tim0_compa_int();
     }
 
     if (int_tim1_ovf) {
       int_tim1_ovf = 0;
-      if (!(PINB & PIN_BTN_UP))
-        ++DST_T;
-      if (!(PINB & PIN_BTN_DOWN))
-        --DST_T;
-      print_dest_temperature();
-      max7219_turn_heater(CUR_T < DST_T);
-      enable_pcie_int();
+      if (old_t != cur_t) {
+        max7219_set_symbol(MS_0, cur_t);
+        old_t = cur_t;
+      }
     }
 
-    if (int_tim0_ovf) {
-      int_tim0_ovf = 0;
-      if (!(--tim0_ovf_cnt)) {
-        tim0_ovf_cnt = TIM0_OVF_CNT;
-        if (old_t != CUR_T) {
-          print_current_temperature();
-          old_t = CUR_T;
-        }
-      }
+    if (int_tim0_compa) {
+      int_tim0_compa = 0;
+      if (!(PINB & PIN_BTN_UP) && btn_up)
+        ++dst_t;
+      if (!(PINB & PIN_BTN_DOWN) && btn_down)
+        --dst_t;
+      max7219_set_symbol(MS_1, dst_t);
+      max7219_turn_heater(cur_t < dst_t);
+      btn_up = btn_down = 0;
+      enable_pcie_int();
     }
   }
 }
 //////////////////////////////////////////////////////////////////////////
 
 void
-handle_sint_adc() {
+handle_sint_adc(int16_t* cur_t) {
   enum {ADC_CNT = 64}; //(0xffff / 0x03ff)
   static int8_t adc_cnt = ADC_CNT+1;
   static uint16_t adc_avg = 0;
-  do {
-    if (--adc_cnt) {
-      adc_avg += ADCW;
-      break;
-    }
-    adc_cnt = ADC_CNT+1;
-    adc_avg >>= 6;
-    CUR_T = adcw_to_temperature(adc_avg);
-    adc_avg = 0;
-  } while(0);
+  if (--adc_cnt) {
+    adc_avg += ADCW;
+    return;
+  }
+  adc_cnt = ADC_CNT+1;
+  adc_avg >>= 6;
+  *cur_t = adcw_to_temperature(adc_avg);
+  adc_avg = 0;
 }
 //////////////////////////////////////////////////////////////////////////
 
-//change this table if TERMISTOR_B, TERMISTOR_RREF, TERMISTOR_R0 or TERMISTOR_T0 is changed
+/**
+  double r, st;
+  static const int MAX = 0x0400;
+  static const int N = MAX/2;
+  static const int step = MAX/N;
+  double sequence[N] = {0.0};
+
+  int i, j;
+  for (i = 0, j = 1; i < N; ++i, j+=step) {
+    r = TERMISTOR_RREF / ((double)MAX / j - 1);
+    st = r / TERMISTOR_R0;
+    st = log(st);
+    st /= TERMISTOR_B;
+    st += 1.0f / (TERMISTOR_T0 + 273.15f);
+    st = 1.0f / st;
+    st -= 273.15f;
+    sequence[i] = st;
+  }
+  printf("const float adc_temperature[] PROGMEM= {\r\n");
+  for (i = 0; i < N; ++i) {
+    if (i%8 == 0) printf("\n");
+    printf("%d, ", (int16_t)(sequence[i]*10));
+  }
+  printf("\n};
+*/
+//change this table with procedure above
+//if TERMISTOR_B, TERMISTOR_RREF, TERMISTOR_R0 or TERMISTOR_T0 is changed
+
 static const int16_t adc_temperature[] PROGMEM= {
   4939, 3406, 2883, 2584, 2381, 2229, 2108, 2010, 1927, 1855, 1793, 1737, 1687, 1642, 1601, 1563,
   1528, 1496, 1465, 1437, 1410, 1385, 1362, 1339, 1318, 1298, 1278, 1260, 1242, 1225, 1209, 1193,
@@ -183,23 +216,11 @@ static const int16_t adc_temperature[] PROGMEM= {
   -448, -458, -469, -481, -494, -508, -523, -539, -557, -577, -600, -627, -659, -701, -762, -881,
 };
 
-uint8_t adcw_to_temperature(uint16_t adc_avg) {
+int16_t adcw_to_temperature(uint16_t adc_avg) {
   int16_t f, l, r;
   f= pgm_read_word(&adc_temperature[adc_avg / 2]);
   l= pgm_read_word(&adc_temperature[adc_avg / 2 + 1]);
-  r = adc_avg % 2 ? f/2+l/2 : f;
+  r = adc_avg % 2 ? (f+l)/2 : f;
   return r / 10;
-}
-//////////////////////////////////////////////////////////////////////////
-
-void
-print_current_temperature() {
-  max7219_set_symbol(MS_0, CUR_T);
-}
-//////////////////////////////////////////////////////////////////////////
-
-void
-print_dest_temperature() {
-  max7219_set_symbol(MS_1, DST_T);
 }
 //////////////////////////////////////////////////////////////////////////

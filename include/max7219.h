@@ -17,7 +17,7 @@ typedef enum max7219_screen {
 } max7219_screen_t;
 
 void max7219_init();
-void max7219_set_symbol(max7219_screen_t pos, uint8_t sym);
+void max7219_set_symbol(max7219_screen_t pos, int16_t sym);
 
 typedef enum max7219_heater_state {
   OFF = 0, ON = 1

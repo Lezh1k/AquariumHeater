@@ -76,3 +76,6 @@ mrproper:
 program:
 	@avrdude -c usbasp -p t25 -U flash:w:$(BIN_DIR)/$(PRG).hex
 
+fuse_program:
+	@avrdude -c usbasp -p t25 -U lfuse:w:0x62:m -U hfuse:w:0x5f:m -U efuse:w:0xff:m 
+
