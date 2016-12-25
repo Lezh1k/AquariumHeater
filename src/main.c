@@ -17,9 +17,7 @@ register uint8_t int_tim0_compa asm("r3");
 register uint8_t int_adc asm("r4");
 register uint8_t int_pcint0 asm("r5");
 register uint8_t int_tim1_ovf asm("r6");
-
-volatile uint8_t btn_down;
-volatile uint8_t btn_up;
+register uint8_t tmp_pinb asm("r7");
 
 enum {START_DST_T = 35};
 
@@ -56,12 +54,9 @@ ISR(ADC_vect) {
 ISR(PCINT0_vect) {
   disable_pcie_int();
   do {
-    if (!(PINB & PIN_BTN_UP)) {
-      btn_up = int_pcint0 = 1;
-      break;
-    }
-    if (!(PINB & PIN_BTN_DOWN)) {
-      btn_down = int_pcint0 = 1;
+    tmp_pinb = PINB;
+    if (!(PINB & PIN_BTN_UP) || !(PINB & PIN_BTN_DOWN)) {
+      int_pcint0 = 1;
       break;
     }
     enable_pcie_int();
@@ -76,7 +71,6 @@ main(void) {
   int16_t cur_t = 0;
   int16_t old_t = 0;
 
-  btn_down = btn_up = 0;
   int_tim0_compa = int_adc = int_pcint0 = 0;
   //configure adc
   ADCSRA = (1 << ADPS2) | (1 << ADEN) ; //use 16 prescaler. in our program it's 1000000/16 ~ 65kHz
@@ -90,8 +84,8 @@ main(void) {
   PCMSK = PORT_BTN_DOWN | PORT_BTN_UP;
   enable_pcie_int();
 
-  TCCR0B = (1 << CS01) | (1 << CS00); //64 prescaler = 0,016320003
-  OCR0A = 157; //~0.01 sec
+  TCCR0B = (1 << CS02);//256 prescaler = 0,06528
+  OCR0A = 0x7f; //~0.03264 sec
 
   TCCR1 = (1 << CS13) | (1 << CS12) | (1 << CS10); //4096 prescaler ~1.2sec
   enable_tim1_ovf_int();
@@ -124,13 +118,15 @@ main(void) {
 
     if (int_tim0_compa) {
       int_tim0_compa = 0;
-      if (!(PINB & PIN_BTN_UP) && btn_up)
-        ++dst_t;
-      if (!(PINB & PIN_BTN_DOWN) && btn_down)
-        --dst_t;
-      max7219_set_symbol(MS_1, dst_t);
-      max7219_turn_heater(cur_t < dst_t);
-      btn_up = btn_down = 0;
+      if (tmp_pinb == PINB) {
+        if (!(tmp_pinb & PIN_BTN_UP))
+          ++dst_t;
+        if (!(tmp_pinb & PIN_BTN_DOWN))
+          --dst_t;
+        max7219_set_symbol(MS_1, dst_t);
+        max7219_turn_heater(cur_t < dst_t);
+      }
+
       enable_pcie_int();
     }
   }

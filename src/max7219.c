@@ -85,11 +85,11 @@ void
 max7219_set_symbol(max7219_screen_t pos, 
                    int16_t sym) {
   register uint8_t spi_port = SPI_PORT;
-  uint16_t s = ((pos+1) << 8) | pgm_read_byte(&codes[sym%10]);
+  uint16_t s = (++pos << 8) | pgm_read_byte(&codes[sym%10]);
   SPI_PORT &= ~HEATER_PORT;
   spi_max7219_send(s);
   sym /= 10;
-  s = (pos << 8) | pgm_read_byte(&codes[sym%10]);
+  s = (--pos << 8) | pgm_read_byte(&codes[sym%10]);
   spi_max7219_send(s);
   SPI_PORT = spi_port;
 }
