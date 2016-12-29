@@ -17,14 +17,17 @@ register uint8_t int_tim0_compa asm("r3");
 register uint8_t int_adc asm("r4");
 register uint8_t int_pcint0 asm("r5");
 register uint8_t int_tim1_ovf asm("r6");
-register uint8_t tmp_pinb asm("r7");
+
+enum {DOWN = 0, UP = 1};
+static volatile uint8_t btn_dec_state = UP;
+static volatile uint8_t btn_inc_state = UP;
 
 enum {START_DST_T = 35};
 
-#define PIN_BTN_UP (1 << PINB3)
-#define PIN_BTN_DOWN (1 << PINB4)
-#define PORT_BTN_UP (1 << PB3)
-#define PORT_BTN_DOWN (1 << PB4)
+#define PIN_BTN_INC   (1 << PINB3)
+#define PIN_BTN_DEC   (1 << PINB4)
+#define PORT_BTN_INC  (1 << PB3)
+#define PORT_BTN_DEC  (1 << PB4)
 //////////////////////////////////////////////////////////////////////////
 
 static void handle_sint_adc(int16_t *cur_t);
@@ -53,12 +56,23 @@ ISR(ADC_vect) {
 
 ISR(PCINT0_vect) {
   disable_pcie_int();
-  do {
-    tmp_pinb = PINB;
-    if (!(PINB & PIN_BTN_UP) || !(PINB & PIN_BTN_DOWN)) {
+  do {    
+    if (!(PINB & PIN_BTN_INC)){
+      btn_inc_state = DOWN;
       int_pcint0 = 1;
       break;
+    } else {
+      btn_inc_state = UP;
     }
+
+    if (!(PINB & PIN_BTN_DEC)) {
+      btn_dec_state = DOWN;
+      int_pcint0 = 1;
+      break;
+    } else {
+      btn_dec_state = UP;
+    }
+
     enable_pcie_int();
   } while(0);
 }
@@ -79,13 +93,13 @@ main(void) {
   max7219_init();
   max7219_set_symbol(MS_1, dst_t);
 
-  PORTB = PORT_BTN_DOWN | PORT_BTN_UP; //pull up resistors
+  PORTB = PORT_BTN_DEC | PORT_BTN_INC; //pull up resistors
 
-  PCMSK = PORT_BTN_DOWN | PORT_BTN_UP;
+  PCMSK = PORT_BTN_DEC | PORT_BTN_INC;
   enable_pcie_int();
 
-  TCCR0B = (1 << CS02);//256 prescaler = 0,06528
-  OCR0A = 0x7f; //~0.03264 sec
+  TCCR0B = (1 << CS02) | (1 << CS00);//1024 prescaler = 976,5625
+  OCR0A = 98; //~0.1sec
 
   TCCR1 = (1 << CS13) | (1 << CS12) | (1 << CS10); //4096 prescaler ~1.2sec
   enable_tim1_ovf_int();
@@ -118,14 +132,14 @@ main(void) {
 
     if (int_tim0_compa) {
       int_tim0_compa = 0;
-      if (tmp_pinb == PINB) {
-        if (!(tmp_pinb & PIN_BTN_UP))
-          ++dst_t;
-        if (!(tmp_pinb & PIN_BTN_DOWN))
-          --dst_t;
-        max7219_set_symbol(MS_1, dst_t);
-        max7219_turn_heater(cur_t < dst_t);
-      }
+
+      if (btn_inc_state == DOWN && !(PINB & PIN_BTN_INC))
+        ++dst_t;
+      if (btn_dec_state == DOWN && !(PINB & PIN_BTN_DEC))
+        --dst_t;
+
+      max7219_set_symbol(MS_1, dst_t);
+      max7219_turn_heater(cur_t < dst_t);
 
       enable_pcie_int();
     }

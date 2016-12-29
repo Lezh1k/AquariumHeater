@@ -32,9 +32,5 @@
 
 #define nop() asm volatile("nop" "\n\t")
 
-#define TERMISTOR_B		3380
-#define TERMISTOR_RREF		10000
-#define TERMISTOR_R0		10000
-#define TERMISTOR_T0		25
 
 #endif /* COMMONS_H_ */
