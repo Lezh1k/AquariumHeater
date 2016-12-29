@@ -56,25 +56,9 @@ ISR(ADC_vect) {
 
 ISR(PCINT0_vect) {
   disable_pcie_int();
-  do {    
-    if (!(PINB & PIN_BTN_INC)){
-      btn_inc_state = DOWN;
-      int_pcint0 = 1;
-      break;
-    } else {
-      btn_inc_state = UP;
-    }
-
-    if (!(PINB & PIN_BTN_DEC)) {
-      btn_dec_state = DOWN;
-      int_pcint0 = 1;
-      break;
-    } else {
-      btn_dec_state = UP;
-    }
-
-    enable_pcie_int();
-  } while(0);
+  int_pcint0 = 1;
+  btn_inc_state = !(PINB & PIN_BTN_INC) ? DOWN : UP;
+  btn_dec_state =  !(PINB & PIN_BTN_DEC) ? DOWN : UP;
 }
 //////////////////////////////////////////////////////////////////////////
 
