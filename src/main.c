@@ -58,7 +58,7 @@ ISR(PCINT0_vect) {
   disable_pcie_int();
   int_pcint0 = 1;
   btn_inc_state = !(PINB & PIN_BTN_INC) ? DOWN : UP;
-  btn_dec_state =  !(PINB & PIN_BTN_DEC) ? DOWN : UP;
+  btn_dec_state = !(PINB & PIN_BTN_DEC) ? DOWN : UP;
 }
 //////////////////////////////////////////////////////////////////////////
 
@@ -210,7 +210,8 @@ static const int16_t adc_temperature[] PROGMEM= {
   -448, -458, -469, -481, -494, -508, -523, -539, -557, -577, -600, -627, -659, -701, -762, -881,
 };
 
-int16_t adcw_to_temperature(uint16_t adc_avg) {
+int16_t
+adcw_to_temperature(uint16_t adc_avg) {
   int16_t f, l, r;
   f= pgm_read_word(&adc_temperature[adc_avg / 2]);
   l= pgm_read_word(&adc_temperature[adc_avg / 2 + 1]);
