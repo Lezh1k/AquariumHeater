@@ -13,14 +13,10 @@
 #include "commons.h"
 #include "max7219.h"
 
-register uint8_t int_tim0_compa asm("r3");
-register uint8_t int_adc asm("r4");
-register uint8_t int_pcint0 asm("r5");
-register uint8_t int_tim1_ovf asm("r6");
-
-enum {DOWN = 0, UP = 1};
-static volatile uint8_t btn_dec_state = UP;
-static volatile uint8_t btn_inc_state = UP;
+static uint8_t int_adc = 0;
+static uint8_t btn_dec_enabled = 1;
+static uint8_t btn_inc_enabled = 1;
+static uint8_t check_temperature_int = 0;
 
 enum {START_DST_T = 35};
 
@@ -28,6 +24,12 @@ enum {START_DST_T = 35};
 #define PIN_BTN_DEC   (1 << PINB4)
 #define PORT_BTN_INC  (1 << PB3)
 #define PORT_BTN_DEC  (1 << PB4)
+
+#define btn_inc_is_down() (!(PINB & PIN_BTN_INC))
+#define btn_inc_is_up() ((PINB & PIN_BTN_INC))
+
+#define btn_dec_is_down() (!(PINB & PIN_BTN_DEC))
+#define btn_dec_is_up() ((PINB & PIN_BTN_DEC))
 //////////////////////////////////////////////////////////////////////////
 
 static void handle_sint_adc(int16_t *cur_t);
@@ -38,27 +40,20 @@ static inline void start_adc() {
 }
 //////////////////////////////////////////////////////////////////////////
 
-ISR(TIMER1_OVF_vect) {
-  int_tim1_ovf = 1;
-}
-//////////////////////////////////////////////////////////////////////////
-
-ISR(TIMER0_COMPA_vect) {
-  disable_tim0_compa_int();
-  int_tim0_compa = 1;
-}
-//////////////////////////////////////////////////////////////////////////
-
 ISR(ADC_vect) {
   int_adc = 1;
 }
 //////////////////////////////////////////////////////////////////////////
 
-ISR(PCINT0_vect) {
-  disable_pcie_int();
-  int_pcint0 = 1;
-  btn_inc_state = !(PINB & PIN_BTN_INC) ? DOWN : UP;
-  btn_dec_state = !(PINB & PIN_BTN_DEC) ? DOWN : UP;
+ISR(TIMER1_COMPA_vect) {
+  if (!btn_inc_enabled) btn_inc_enabled = 1;
+  if (!btn_dec_enabled) btn_dec_enabled = 1;
+  disable_tim1_compA_int();
+}
+//////////////////////////////////////////////////////////////////////////
+
+ISR(TIMER1_COMPB_vect) {
+  check_temperature_int = 1;
 }
 //////////////////////////////////////////////////////////////////////////
 
@@ -67,9 +62,7 @@ int
 main(void) {
   int16_t dst_t = START_DST_T;
   int16_t cur_t = 0;
-  int16_t old_t = 0;
-
-  int_tim0_compa = int_adc = int_pcint0 = 0;
+  int16_t old_t = 0;  
   //configure adc
   ADCSRA = (1 << ADPS2) | (1 << ADEN) ; //use 16 prescaler. in our program it's 1000000/16 ~ 65kHz
   enable_adc_int(); //enable adc interrupt
@@ -77,16 +70,12 @@ main(void) {
   max7219_init();
   max7219_set_symbol(MS_1, dst_t);
 
-  PORTB = PORT_BTN_DEC | PORT_BTN_INC; //pull up resistors
-
-  PCMSK = PORT_BTN_DEC | PORT_BTN_INC;
-  enable_pcie_int();
-
-  TCCR0B = (1 << CS02) | (1 << CS00);//1024 prescaler = 976,5625
-  OCR0A = 98; //~0.1sec
+  PORTB = PORT_BTN_DEC | PORT_BTN_INC; //pull up resistors  
 
   TCCR1 = (1 << CS13) | (1 << CS12) | (1 << CS10); //4096 prescaler ~1.2sec
-  enable_tim1_ovf_int();
+  OCR1A = 0xff >> 1;
+  OCR1B = 0xff;
+  enable_tim1_compB_int();
 
   sei();
   start_adc();
@@ -100,35 +89,33 @@ main(void) {
       start_adc();
     }
 
-    if (int_pcint0) {
-      int_pcint0 = 0;
-      TCNT0 = 0;
-      enable_tim0_compa_int();
-    }
-
-    if (int_tim1_ovf) {
-      int_tim1_ovf = 0;
+    if (check_temperature_int) {
+      check_temperature_int = 0;
       if (old_t != cur_t) {
         max7219_set_symbol(MS_0, cur_t);
         old_t = cur_t;
       }
     }
 
-    if (int_tim0_compa) {
-      int_tim0_compa = 0;
-
-      if (btn_inc_state == DOWN && !(PINB & PIN_BTN_INC))
-        ++dst_t;
-      if (btn_dec_state == DOWN && !(PINB & PIN_BTN_DEC))
-        --dst_t;
-
+    if (btn_inc_enabled && btn_inc_is_down()) {
+      btn_inc_enabled = 0;
+      ++dst_t;
       max7219_set_symbol(MS_1, dst_t);
       max7219_turn_heater(cur_t < dst_t);
-
-      enable_pcie_int();
+      TCNT1 = 0x00;
+      enable_tim1_compA_int();
     }
-  }
-}
+
+    if (btn_dec_enabled && btn_dec_is_down()) {
+      btn_dec_enabled = 0;
+      --dst_t;
+      max7219_set_symbol(MS_1, dst_t);
+      max7219_turn_heater(cur_t < dst_t);
+      TCNT1 = 0x00;
+      enable_tim1_compA_int();
+    }
+  } //while(1)
+} //main
 //////////////////////////////////////////////////////////////////////////
 
 void
