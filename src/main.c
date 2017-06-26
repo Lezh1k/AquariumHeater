@@ -13,10 +13,11 @@
 #include "commons.h"
 #include "max7219.h"
 
-static uint8_t int_adc = 0;
-static uint8_t btn_dec_enabled = 1;
-static uint8_t btn_inc_enabled = 1;
-static uint8_t check_temperature_int = 0;
+static uint8_t int_adc __attribute__((used)) = 0; //used in interrupt. could be removed by compiler
+static uint8_t check_temperature_int __attribute__((used)) = 0; //used in interrupt. could be removed by compiler
+
+static volatile uint8_t btn_dec_enabled = 1;
+static volatile uint8_t btn_inc_enabled = 1;
 
 enum {START_DST_T = 35};
 
@@ -46,9 +47,8 @@ ISR(ADC_vect) {
 //////////////////////////////////////////////////////////////////////////
 
 ISR(TIMER1_COMPA_vect) {
-  if (!btn_inc_enabled) btn_inc_enabled = 1;
-  if (!btn_dec_enabled) btn_dec_enabled = 1;
   disable_tim1_compA_int();
+  btn_inc_enabled = btn_dec_enabled = 1;
 }
 //////////////////////////////////////////////////////////////////////////
 
@@ -57,12 +57,16 @@ ISR(TIMER1_COMPB_vect) {
 }
 //////////////////////////////////////////////////////////////////////////
 
-
 int
 main(void) {
   int16_t dst_t = START_DST_T;
   int16_t cur_t = 0;
-  int16_t old_t = 0;  
+  int16_t old_t = 0;
+  register uint8_t need_set_symbol = 0;
+
+  DDRB = 0x00;
+  PORTB = 0x00;
+
   //configure adc
   ADCSRA = (1 << ADPS2) | (1 << ADEN) ; //use 16 prescaler. in our program it's 1000000/16 ~ 65kHz
   enable_adc_int(); //enable adc interrupt
@@ -70,7 +74,7 @@ main(void) {
   max7219_init();
   max7219_set_symbol(MS_1, dst_t);
 
-  PORTB = PORT_BTN_DEC | PORT_BTN_INC; //pull up resistors  
+  PORTB |= PORT_BTN_DEC | PORT_BTN_INC; //pull up resistors
 
   TCCR1 = (1 << CS13) | (1 << CS12) | (1 << CS10); //4096 prescaler ~1.2sec
   OCR1A = 0xff >> 1;
@@ -100,19 +104,21 @@ main(void) {
     if (btn_inc_enabled && btn_inc_is_down()) {
       btn_inc_enabled = 0;
       ++dst_t;
-      max7219_set_symbol(MS_1, dst_t);
-      max7219_turn_heater(cur_t < dst_t);
-      TCNT1 = 0x00;
-      enable_tim1_compA_int();
+      need_set_symbol = 1;
     }
 
-    if (btn_dec_enabled && btn_dec_is_down()) {
+    if (btn_dec_enabled && btn_dec_is_down()) {      
       btn_dec_enabled = 0;
       --dst_t;
+      need_set_symbol = 1;
+    }   
+
+    if (need_set_symbol) {
       max7219_set_symbol(MS_1, dst_t);
       max7219_turn_heater(cur_t < dst_t);
       TCNT1 = 0x00;
       enable_tim1_compA_int();
+      need_set_symbol = 0;
     }
   } //while(1)
 } //main
