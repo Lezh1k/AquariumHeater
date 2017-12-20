@@ -65,8 +65,7 @@ main(void) {
   register uint8_t need_set_symbol = 0;
 
   DDRB = 0x00;
-  PORTB = 0x00;
-
+  PORTB = 0x00;  
   //configure adc
   ADCSRA = (1 << ADPS2) | (1 << ADEN) ; //use 16 prescaler. in our program it's 1000000/16 ~ 65kHz
   enable_adc_int(); //enable adc interrupt

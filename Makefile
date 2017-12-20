@@ -7,9 +7,8 @@ OBJCOPY = $(AVR_PREFIX)objcopy
 OBJDUMP = $(AVR_PREFIX)objdump
 AR = $(AVR_PREFIX)ar
 NM = $(AVR_PREFIX)nm
-AS = $(AVR_PREFIX)as
+AS = $(AVR_PREFIX)as4
 LD = $(AVR_PREFIX)ld
-SIZE = $(AVR_PREFIX)size
 
 LIBS = 
 DEFS = -DNDEBUG -D__AVR_ATtiny25__ 
@@ -30,12 +29,12 @@ INCLUDES = -Iinclude -I$(AVR_TOOLCHAIN_PATH)/avr/include
 override CFLAGS = $(INCLUDES) $(MMCU) $(OPTIMIZE) $(DEFS) -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -std=gnu99 \
   -Wl,--start-group  -Wl,--end-group -Wl,--gc-sections
 
-override LDFLAGS = -Wl,-Map,$(BIN_DIR)/$(PRG).map $(MMCU)
+override LDFLAGS = -Wl,-Map,$(BIN_DIR)/$(PRG).map $(MMCU) -Wl,-print-memory-usage
 
 SOURCES = $(wildcard $(SRC_DIR)/*.c)
 OBJECTS	= $(patsubst %,$(BUILD_DIR)/%.o, $(subst src/,,$(subst .c,,$(SOURCES))))
 
-all: directories heater hex_size
+all: directories heater
 heater: $(BIN_DIR)/$(PRG).elf $(BIN_DIR)/lst $(BIN_DIR)/text 
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
@@ -57,9 +56,6 @@ $(BIN_DIR)/%.hex: $(BIN_DIR)/%.elf
 $(BIN_DIR)/bin: $(BIN_DIR)/$(PRG).bin
 $(BIN_DIR)/%.bin: $(BIN_DIR)/%.elf
 	$(OBJCOPY) -j .text -j .data -O binary $< $@
-
-hex_size:
-	$(SIZE) $(BIN_DIR)/$(PRG).elf
 
 directories:
 	@mkdir -p $(BUILD_DIR)
